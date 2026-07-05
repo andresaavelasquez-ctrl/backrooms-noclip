@@ -303,6 +303,7 @@
 
   // ---------- construcción de la escena del nivel ----------
   let lastLevelId = null;
+  let lastRunSeed = null;   // partida a la que pertenece la escena actual
   let solidosCamara = [];
   const rayo = new THREE.Raycaster();
 
@@ -931,12 +932,23 @@
   // ---------- frame ----------
   function frame(world, t) {
     if (!world.level || !world.map) return;
-    const key = world.level.id + '::' + (world.entryCount?.[world.level.id] ?? 0) +
-      '::' + (world.mapaVersion || 0); // remodelaciones no euclidianas → rebuild
+    // el runSeed va DENTRO de la clave: tras morir y reaparecer, el nuevo Level 0
+    // comparte id/entryCount/mapaVersion con el anterior pero es OTRO mapa (semilla
+    // nueva). Sin el runSeed la clave coincidía y render3d NO reconstruía → los
+    // muros que se veían no eran los del grid real = «colisiones bugeadas» hasta
+    // que una remodelación subía mapaVersion.
+    const key = (world.runSeed || '') + '::' + world.level.id + '::' +
+      (world.entryCount?.[world.level.id] ?? 0) +
+      '::' + (world.mapaVersion || 0); // partida + entrada + remodelaciones → rebuild
     if (key !== levelKey) {
-      const esMismoNivel = lastLevelId === world.level.id && staticGroup;
+      // «mismo nivel» solo si además es la MISMA partida: un Level 0 de otra run
+      // debe purgarse por completo, no reconstruirse de forma incremental sobre
+      // la geometría vieja.
+      const esMismoNivel = lastLevelId === world.level.id &&
+        lastRunSeed === world.runSeed && staticGroup;
       levelKey = key;
       lastLevelId = world.level.id;
+      lastRunSeed = world.runSeed;
       terminarRevelado(); // si había un revelado a medias, se completa YA
       if (world._shift3d) {
         // expansión del nivel infinito: cámara y escena vieja se desplazan
