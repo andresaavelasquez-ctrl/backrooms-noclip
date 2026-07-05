@@ -256,7 +256,25 @@ El proyecto usa git (historial de versiones automático que gestiona Claude). Pa
 de seguridad simple: copia la carpeta entera `Proyect Backrooms` a un disco externo.
 Tu progreso de jugador NO está en la carpeta: expórtalo desde el botón **Exportar** del título.
 
-## 11. Si algo falla
+## 11. El proyecto en GitHub (para tu comunidad)
+
+El juego es público en **https://github.com/AgenteMaxo/backrooms-noclip** con licencia
+**PolyForm Noncommercial**: cualquiera puede jugarlo, estudiarlo y modificarlo, pero
+**solo tú puedes comercializarlo**. Nadie puede tocar tu repositorio: la comunidad hace
+una copia (*fork*), la modifica y te envía un **Pull Request** (una propuesta de cambio)
+que solo tú puedes aceptar o rechazar.
+
+- **Publicar tus cambios**: dile a Claude «haz commit y push» (o solo «push» si ya hay
+  commit). Hasta que no se hace *push*, los cambios solo existen en tu ordenador.
+- **Ver los Pull Requests pendientes**: pestaña «Pull requests» del repositorio, o dile a
+  Claude «revisa los PRs pendientes» — puede leerlos, probarlos y darte su opinión antes
+  de que decidas.
+- **Aceptar un PR**: botón verde **Merge pull request** en la web (solo tú lo ves).
+  Consejo: nunca aceptes un PR sin que Claude lo haya revisado antes.
+- **Issues**: la pestaña «Issues» es el buzón de bugs y sugerencias de la comunidad —
+  puedes enseñarla en directo y pedirle a Claude que arregle los que te convenzan.
+
+## 12. Si algo falla
 
 - Pulsa **F12** en el navegador → pestaña «Consola» → haz captura de los mensajes en rojo
   y enséñasela a Claude.
