@@ -82,8 +82,10 @@ wss.on('connection', (ws, req) => {
       const nombre = filtro.nombreLimpio(m.nombre);
       const expediente = db.conectar(m.token, nombre);
       if (expediente.baneado) { ws.close(1008, 'baneado'); return; }
-      // ?nivel= de desarrollo: entrar directo a otro nivel (se cierra en M4)
-      const nivel = m.nivel && DATA.levels[m.nivel] ? m.nivel : NIVEL_INICIAL;
+      // puerta de desarrollo (?nivel=): SOLO con MMO_DEV=1 — en producción
+      // todo el mundo despierta en Level 0, como manda el lore
+      const devOk = process.env.MMO_DEV === '1';
+      const nivel = devOk && m.nivel && DATA.levels[m.nivel] ? m.nivel : NIVEL_INICIAL;
       sala = asignar(nivel);
       prepararSala(sala);
       jug = sala.entrar(ws, nombre, m.token, expediente);

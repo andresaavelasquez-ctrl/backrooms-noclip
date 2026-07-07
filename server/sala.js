@@ -380,17 +380,33 @@ function asignar(nivelId) {
   }
 }
 
+// métricas del bucle de simulación (visibles en /estado)
+const metricas = { ultMs: 0, maxMs: 0, medias: [] };
+
 function tickTodas(ahora) {
-  for (const s of salas.values()) s.tick(ahora);
+  const t0 = process.hrtime.bigint();
+  for (const s of salas.values()) {
+    // una sala rota no puede tumbar el resto del mundo
+    try { s.tick(ahora); } catch (e) { console.error(`[sala ${s.clave}] tick:`, e.message); }
+  }
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
+  metricas.ultMs = ms;
+  if (ms > metricas.maxMs) metricas.maxMs = ms;
+  metricas.medias.push(ms);
+  if (metricas.medias.length > 300) metricas.medias.shift(); // últimos 30 s
 }
 
 function estado() {
+  const media = metricas.medias.length
+    ? metricas.medias.reduce((a, b) => a + b, 0) / metricas.medias.length : 0;
   return {
     salas: [...salas.values()].map((s) => ({
       clave: s.clave, jugadores: s.jugadores.size,
       entidades: s.entidades.filter((e) => e.viva).length,
     })),
     total: [...salas.values()].reduce((n, s) => n + s.jugadores.size, 0),
+    tick: { ultimoMs: +metricas.ultMs.toFixed(2), medioMs: +media.toFixed(2), maxMs: +metricas.maxMs.toFixed(2) },
+    memoriaMB: Math.round(process.memoryUsage().rss / 1048576),
   };
 }
 
