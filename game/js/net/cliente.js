@@ -13,12 +13,12 @@
   let inputEnviado = { dx: 0, dy: 0 };
   let rotEnviada = 0, rotUltEnvio = 0;
   let tileFov = null; // último tile con FOV calculado
-  // v23 — latencia y reconciliación honesta: historial de posiciones locales
-  // para comparar la posición del servidor CONTRA DÓNDE ESTABAS cuando él la
-  // calculó (comparar contra el presente te arrastra hacia atrás al correr)
-  let rtt = 100;           // ms ida y vuelta (medido con ping/pong)
+  // v23 — rastro de posiciones locales para la reconciliación (ver
+  // reconciliar()): la posición del servidor siempre llega VIEJA; compararla
+  // contra el presente arrastra al jugador hacia atrás mientras corre
+  let rtt = 100;           // ms ida y vuelta (medido con ping/pong; telemetría)
   let pingTimer = null;
-  const historia = [];     // [{t, x, y}] de la predicción local (~1 s)
+  const historia = [];     // [{t, x, y}] de la predicción local (~1.2 s)
 
   function urlServidor() {
     const params = new URLSearchParams(location.search);
@@ -447,28 +447,34 @@
     while (historia.length && historia[0].t < ahora - 1200) historia.shift();
   }
 
-  // Posición autoritativa propia (v23): se compara contra DÓNDE ESTABAS hace
-  // ~RTT/2+medio tick — comparar contra el presente convertía la latencia en
-  // tirones de goma hacia atrás cada tick mientras corrías (los «lagazos»).
+  // Posición autoritativa propia (v23.1): el servidor REPITE tu trayectoria
+  // con retraso (tu input tarda ~rtt/2 en llegarle y su foto otro ~rtt/2 en
+  // volver, más el tick de 100 ms) — su posición corresponde a ALGÚN punto de
+  // tu rastro reciente, y el jitter de la red impide clavar cuál por reloj
+  // (intentarlo producía tirones a 10 Hz con ping real). Por eso se compara
+  // contra TODO el rastro: si el servidor confirma cualquier punto del camino,
+  // no hay nada que corregir; parado, ambos convergen al mismo sitio. Solo una
+  // desviación respecto a todo el rastro es desincronización real — y el
+  // error se mide desde el punto MÁS CERCANO y se aplica como desplazamiento
+  // (nunca tirando hacia una posición vieja).
   function reconciliar(w, sx, sy) {
-    const objetivo = performance.now() - (rtt / 2 + 60);
-    let ref = null;
+    let d = Fisica.dist(w.player.x, w.player.y, sx, sy);
+    let refX = w.player.x, refY = w.player.y;
     for (let i = historia.length - 1; i >= 0; i--) {
-      if (historia[i].t <= objetivo) { ref = historia[i]; break; }
+      const h = historia[i];
+      const dh = Fisica.dist(h.x, h.y, sx, sy);
+      if (dh < d) { d = dh; refX = h.x; refY = h.y; }
+      if (d < 0.35) return; // el servidor va por nuestro rastro: todo en orden
     }
-    if (!ref) ref = historia[0] || { x: w.player.x, y: w.player.y };
-    const ex = sx - ref.x, ey = sy - ref.y;
-    const d = Math.hypot(ex, ey);
-    if (d < 0.06) return; // dentro del margen: la predicción va bien
-    if (d > 1.4) {
-      // desincronización real (empujón, colisión que no vimos): snap limpio
+    if (d > 1.5) {
+      // desincronización real (teleport perdido, empujón, pared): corte limpio
       w.player.x = sx; w.player.y = sy;
       historia.length = 0;
       fov(w);
       return;
     }
-    // corrección suave: se APLICA EL ERROR (no se tira hacia la pos vieja)
-    const nx = w.player.x + ex * 0.25, ny = w.player.y + ey * 0.25;
+    // deriva moderada: fracción del error (servidor − punto más cercano)
+    const nx = w.player.x + (sx - refX) * 0.25, ny = w.player.y + (sy - refY) * 0.25;
     if (!Fisica.choca(w.map.grid, nx, ny)) { w.player.x = nx; w.player.y = ny; }
   }
 

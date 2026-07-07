@@ -220,11 +220,16 @@ Movimiento LIBRE (input vectorial, θ continuo en `player.rot` online); el modo 
 turnos sigue con `?autostart=1` (sin `?online`).
 
 **v23 — red suave, retorno online y Ajustes de guardián**: interpolación por INSTANTÁNEAS
-(`Otros.pushSnap/muestrear`, retardo 150 ms) para jugadores remotos Y entidades (main.js
-salta el lerp si hay `_snaps`); reconciliación contra HISTORIAL local (`historia` en
-cliente.js, RTT medido con ping/pong con eco `ts`) — comparar contra el presente causaba
-tirones de goma al correr; el input se frena al abrir chat y al cambiar de sala (ambos
-lados). Puerta de RETORNO online (paridad con el modo solo): `cambiarDeSala` busca en el
+(`Otros.pushSnap/muestrear`, retardo 200 ms) para jugadores remotos Y entidades (main.js
+salta el lerp si hay `_snaps`); reconciliación por RASTRO (`historia` en cliente.js): la
+posición del servidor corresponde a ~rtt+tick ATRÁS en tu trayectoria — si coincide con
+CUALQUIER punto del rastro (≤0.35) no se corrige nada; si se desvía de todos, el error se
+mide desde el punto MÁS CERCANO y se aplica como desplazamiento. LECCIÓN v23.1: NO usar el
+reloj (rtt/2+X) como referencia — el jitter de red hace imposible clavar el instante y
+cada foto aplica un micro-tirón a 10 Hz (verificado con simulación: ~1.8 tiles/12 s de
+tirones por reloj vs 0 por rastro; ping local ≈0 NO reproduce el bug — probar con
+latencia). RTT medido con ping/pong eco `ts` (telemetría en Net.rtt). El input se frena al
+abrir chat y al cambiar de sala (ambos lados). Puerta de RETORNO online (paridad con el modo solo): `cambiarDeSala` busca en el
 destino una salida con `destino === origen` y te hace spawn PEGADO a ella, o crea
 `jug.retorno` — puerta PERSONAL (índice `'R'` en `salidaCerca`/`ofrecer`; el cliente la
 añade a `map.exits` solo en su lado vía `m.retorno`); sin retorno si `esSinRetorno`

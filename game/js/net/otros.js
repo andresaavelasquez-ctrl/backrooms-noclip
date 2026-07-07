@@ -37,7 +37,7 @@
   // producía tirones (rápido al llegar el paquete, frenazo después). Ahora se
   // guardan con su hora de llegada y se dibuja ~RETARDO ms EN EL PASADO,
   // interpolando entre dos instantáneas reales: velocidad constante.
-  const RETARDO_INTERP = 150; // ms (~1.5 ticks: siempre hay un par que rodear)
+  const RETARDO_INTERP = 200; // ms (2 ticks: aguanta el jitter de red sin quedarse sin par)
 
   function pushSnap(o, x, y) {
     const buf = o._snaps || (o._snaps = []);
