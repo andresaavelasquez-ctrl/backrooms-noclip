@@ -1,7 +1,7 @@
 // Protocolo v1 de BACKROOMS MMO — mensajes JSON pequeños sobre WebSocket.
 //
 // Cliente → servidor:
-//   {t:'hola', nombre, token, v}        presentarse (v = versión de protocolo)
+//   {t:'hola', nombre, token, v, sala?} presentarse (sala = código privado opcional)
 //   {t:'mover', dx, dy}                 intento de paso a casilla adyacente
 //   {t:'rot', rot}                      girar sobre sí mismo (0-3, gratis)
 //   {t:'chat', txt}                     mensaje de chat (≤120 chars)
@@ -27,6 +27,7 @@ const COOLDOWN_CHAT = 1500;   // ms entre mensajes de chat
 const RADIO_CHAT = 14;        // casillas: el chat es de PROXIMIDAD (voz, no megafonía)
 const CAP_SALA = 60;          // jugadores por instancia de nivel
 const CAP_POR_IP = 8;         // conexiones simultáneas por IP
+const MAX_SALA_PRIVADA = 32;  // caracteres máximos del código de sala privada
 
 // Parsea y valida la FORMA de un mensaje entrante. Devuelve null si no es válido.
 function leer(raw) {
@@ -40,6 +41,7 @@ function leer(raw) {
       if (typeof m.nombre !== 'string' || typeof m.token !== 'string') return null;
       if (m.token.length > 64) return null;
       if (m.nivel !== undefined && (typeof m.nivel !== 'string' || m.nivel.length > 32)) return null;
+      if (m.sala !== undefined && (typeof m.sala !== 'string' || m.sala.length > MAX_SALA_PRIVADA)) return null;
       return m;
     case 'p': { // v24: POSICIÓN reportada por el cliente (él es la autoridad
       // del movimiento; el servidor la VALIDA — velocidad, paredes, teleports)
@@ -90,6 +92,7 @@ function leer(raw) {
 }
 
 module.exports = {
-  VERSION, MAX_MSG, MAX_CHAT, COOLDOWN_MOVER, COOLDOWN_CHAT, RADIO_CHAT, CAP_SALA, CAP_POR_IP,
+  VERSION, MAX_MSG, MAX_CHAT, COOLDOWN_MOVER, COOLDOWN_CHAT, RADIO_CHAT,
+  CAP_SALA, CAP_POR_IP, MAX_SALA_PRIVADA,
   leer,
 };

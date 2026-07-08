@@ -671,6 +671,61 @@
   // ---------- título y perfiles ----------
   const $id = (x) => document.getElementById(x);
   const P = Game.Profiles;
+  let esperaConexion = null;
+
+  function salaPrivadaTitulo() {
+    return ($id('room-input')?.value || '').trim();
+  }
+
+  function validarSalaPrivada(salaPrivada) {
+    if (!salaPrivada || /^[a-z0-9_-]{3,32}$/i.test(salaPrivada)) return true;
+    const errNet = $id('title-net');
+    errNet.textContent = 'Código de sala privada inválido. Usa 3-32 letras, números, _ o -.';
+    errNet.style.display = 'block';
+    $id('room-input')?.focus();
+    return false;
+  }
+
+  function conectarAlServidor(btnOrigen) {
+    if (!P.activeName()) P.create($id('profile-name').value.trim() || 'Errante');
+    refreshTitle();
+    const salaPrivada = salaPrivadaTitulo();
+    if (!validarSalaPrivada(salaPrivada)) return;
+    const btnStart = $id('btn-start');
+    const btnContinue = $id('btn-continue');
+    const btn = btnOrigen || btnStart;
+    const errNet = $id('title-net');
+    const textoStart = 'DESPERTAR EN LEVEL 0';
+    const textoContinue = btnContinue.textContent;
+    btnStart.disabled = true;
+    btnContinue.disabled = true;
+    btn.textContent = 'CRUZANDO LA REALIDAD…';
+    errNet.style.display = 'none';
+    if (esperaConexion) clearInterval(esperaConexion);
+    Net.iniciar(P.activeName(), salaPrivada || undefined);
+    const t0 = Date.now();
+    esperaConexion = setInterval(() => {
+      if (Net.activo) {
+        clearInterval(esperaConexion);
+        esperaConexion = null;
+        btnStart.disabled = false;
+        btnContinue.disabled = false;
+        btnStart.textContent = textoStart;
+        btnContinue.textContent = textoContinue;
+        errNet.style.display = 'none';
+      } else if (Net.ultimoError || Date.now() - t0 > 10000) {
+        clearInterval(esperaConexion);
+        esperaConexion = null;
+        btnStart.disabled = false;
+        btnContinue.disabled = false;
+        btnStart.textContent = textoStart;
+        btnContinue.textContent = textoContinue;
+        errNet.textContent = Net.ultimoError ||
+          'No se pudo conectar con las Backrooms. ¿El servidor está despierto?';
+        errNet.style.display = 'block';
+      }
+    }, 200);
+  }
 
   function refreshTitle() {
     const sel = $id('profile-select');
@@ -695,8 +750,8 @@
     const btn = $id('btn-continue');
     if (saveData && p) {
       btn.style.display = 'inline-block';
-      btn.textContent = `Continuar partida (${saveData.levelId}, semilla ${saveData.runSeed})`;
-      btn.onclick = () => Game.continueRun(saveData);
+      btn.textContent = `Continuar en servidor (${saveData.levelId})`;
+      btn.onclick = () => conectarAlServidor(btn);
     } else btn.style.display = 'none';
   }
 
@@ -735,32 +790,7 @@
   $id('btn-codex').onclick = () => world.ui.toggleCodex(true);
 
   $id('btn-start').onclick = () => {
-    if (!P.activeName()) P.create($id('profile-name').value.trim() || 'Errante');
-    refreshTitle();
-    // BACKROOMS MMO: el botón del título conecta al mundo compartido
-    const btn = $id('btn-start');
-    const errNet = $id('title-net');
-    btn.disabled = true;
-    btn.textContent = 'CRUZANDO LA REALIDAD…';
-    errNet.style.display = 'none';
-    Net.iniciar(P.activeName());
-    const t0 = Date.now();
-    const espera = setInterval(() => {
-      if (Net.activo) {
-        clearInterval(espera);
-        btn.disabled = false;
-        btn.textContent = 'DESPERTAR EN LEVEL 0';
-        errNet.style.display = 'none';
-      } else if (Net.ultimoError || Date.now() - t0 > 10000) {
-        // conexión rechazada o muerta: que el streamer VEA el porqué
-        clearInterval(espera);
-        btn.disabled = false;
-        btn.textContent = 'DESPERTAR EN LEVEL 0';
-        errNet.textContent = Net.ultimoError ||
-          'No se pudo conectar con las Backrooms. ¿El servidor está despierto?';
-        errNet.style.display = 'block';
-      }
-    }, 200);
+    conectarAlServidor($id('btn-start'));
   };
   $id('btn-again').onclick = () => {
     refreshTitle();
