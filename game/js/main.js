@@ -1,7 +1,7 @@
 // Arranque: input, bucle de animación y pantalla de título.
 (function () {
   // versión visible del juego (Ajustes); súbela con cada tanda de cambios
-  window.VERSION_JUEGO = 'v26.1';
+  window.VERSION_JUEGO = 'v26.2';
   const world = Game.world;
   world.data = window.GAME_DATA;
 
@@ -72,7 +72,8 @@
     journal: 11,
     chat: 12
   },
-  cursorSpeed: 8, dado: true };
+  cursorSpeed: 8, dado: true,
+  camaraModo: 'clic', camaraInvertir: false, camaraSens: 100 };
   try { 
     const storedOpts = JSON.parse(localStorage.getItem('backrooms-opts')) || {};
     if (storedOpts.gamepadMap) {
@@ -87,6 +88,39 @@
     OPTS.dado = optDado.checked;
     try { localStorage.setItem('backrooms-opts', JSON.stringify(OPTS)); } catch (e) {}
   };
+
+  const optCamaraModo = document.getElementById('opt-camara-modo');
+  if (optCamaraModo) {
+    optCamaraModo.value = OPTS.camaraModo || 'clic';
+    optCamaraModo.onchange = () => {
+      OPTS.camaraModo = optCamaraModo.value;
+      try { localStorage.setItem('backrooms-opts', JSON.stringify(OPTS)); } catch (e) {}
+      if (OPTS.camaraModo !== 'libre' && document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    };
+  }
+  const optCamaraInvertir = document.getElementById('opt-camara-invertir');
+  if (optCamaraInvertir) {
+    optCamaraInvertir.checked = !!OPTS.camaraInvertir;
+    optCamaraInvertir.onchange = () => {
+      OPTS.camaraInvertir = optCamaraInvertir.checked;
+      try { localStorage.setItem('backrooms-opts', JSON.stringify(OPTS)); } catch (e) {}
+    };
+  }
+  const optCamaraSens = document.getElementById('opt-camara-sens');
+  const optCamaraSensV = document.getElementById('opt-camara-sens-v');
+  if (optCamaraSens) {
+    optCamaraSens.value = OPTS.camaraSens !== undefined ? OPTS.camaraSens : 100;
+    if (optCamaraSensV) optCamaraSensV.textContent = optCamaraSens.value + '%';
+    optCamaraSens.oninput = () => {
+      OPTS.camaraSens = parseInt(optCamaraSens.value, 10);
+      if (optCamaraSensV) optCamaraSensV.textContent = OPTS.camaraSens + '%';
+    };
+    optCamaraSens.onchange = () => {
+      try { localStorage.setItem('backrooms-opts', JSON.stringify(OPTS)); } catch (e) {}
+    };
+  }
 
   // ---------- menú de ajustes de sonido ----------
   const sndMenu = document.getElementById('sound-menu');
@@ -175,37 +209,85 @@
     document.body.classList.toggle('fs', fs);
   }
   document.addEventListener('fullscreenchange', () => {
-    btnFs.textContent = document.fullscreenElement
+    const isFullscreen = !!document.fullscreenElement;
+    btnFs.textContent = isFullscreen
       ? 'Salir de pantalla completa' : 'Pantalla completa';
     ajustarLienzo();
+    // Captura la tecla Escape en pantalla completa: sin esto, al liberar el
+    // Pointer Lock con ESC el navegador cierra TAMBIÉN la pantalla completa
+    // de golpe (comportamiento nativo de seguridad). Con el teclado
+    // capturado, Chrome exige mantener ESC pulsado un momento para forzar
+    // la salida real de pantalla completa — nuestro propio handler sigue
+    // liberando solo el Pointer Lock en la primera pulsación.
+    if (isFullscreen) {
+      if (navigator.keyboard && navigator.keyboard.lock) {
+        navigator.keyboard.lock(['Escape']).catch((e) => {
+          console.warn('Keyboard lock falló:', e);
+        });
+      }
+    } else if (navigator.keyboard && navigator.keyboard.unlock) {
+      navigator.keyboard.unlock();
+    }
   });
   window.addEventListener('resize', ajustarLienzo);
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
   ajustarLienzo();
 
-  // ---------- cámara libre con el RATÓN (v25, online 3ªP): CLIC DERECHO y
-  // arrastrar, al estilo Roblox (v26.1: antes cualquier botón, y con el
-  // sentido del giro invertido respecto a lo esperado) ----------
+  // ---------- cámara libre con el RATÓN (v25, online 3ªP) ----------
+  // Ajustes → OPTS.camaraModo: 'clic' (clic derecho y arrastrar, por
+  // defecto, estilo Roblox) o 'libre' (Pointer Lock: clic izquierdo
+  // engancha el puntero, ESC lo libera — sin chocar con el borde de la
+  // pantalla). Inversión y sensibilidad se aplican a los tres caminos
+  // (clic, libre y arrastre táctil) para que el gesto se sienta igual.
   {
     const wrap = document.getElementById('game-wrap');
     let arrastre = null;
     let arrastreTactil = null;
+    let justLocked = false;
     wrap.addEventListener('contextmenu', (ev) => ev.preventDefault());
     wrap.addEventListener('mousedown', (ev) => {
-      if (ev.button !== 2) return; // solo clic derecho
       if (!world.online || !use3D || Render3D.modo !== 'tercera') return;
-      if (ev.target.closest('button, input, select, #backpack-panel, #log-panel')) return;
+      if (world.busy) return;
+      if (ev.target.closest('button, input, select, #backpack-panel, #log-panel, #journal-panel, #codex-panel, #sound-menu, .choice-modal, .modal-box')) return;
+      const modo = window.OPTS.camaraModo || 'clic';
+      if (modo === 'libre') {
+        if (ev.button !== 0) return; // clic izquierdo engancha el puntero
+        if (document.pointerLockElement !== wrap) wrap.requestPointerLock();
+        return;
+      }
+      if (ev.button !== 2) return; // modo clic: solo el derecho arrastra
       arrastre = ev.clientX;
       wrap.classList.add('orbitando');
     });
     window.addEventListener('mousemove', (ev) => {
+      const modo = window.OPTS.camaraModo || 'clic';
+      const factor = window.OPTS.camaraInvertir ? 1 : -1;
+      const sensMult = (window.OPTS.camaraSens !== undefined ? window.OPTS.camaraSens : 100) / 100;
+      if (modo === 'libre' && document.pointerLockElement === wrap) {
+        if (justLocked) { justLocked = false; return; } // tirón del centrado del navegador
+        const dx = ev.movementX || 0;
+        if (Math.abs(dx) > 200) return; // salto anómalo del cursor: se ignora
+        Render3D.orbita(factor * dx * 0.0035 * sensMult);
+        return;
+      }
       if (arrastre === null) return;
-      Render3D.orbita((arrastre - ev.clientX) * 0.0085);
+      Render3D.orbita(factor * (arrastre - ev.clientX) * 0.0085 * sensMult);
       arrastre = ev.clientX;
     });
     window.addEventListener('mouseup', () => {
       arrastre = null;
       wrap.classList.remove('orbitando');
+    });
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement === wrap) {
+        justLocked = true;
+      } else {
+        arrastre = null;
+        wrap.classList.remove('orbitando');
+        teclas.clear();
+        tactilDirs.clear();
+        if (world.online && window.Net) Net.parar();
+      }
     });
     wrap.addEventListener('pointerdown', (ev) => {
       if (ev.pointerType === 'mouse') return;
@@ -219,7 +301,9 @@
     wrap.addEventListener('pointermove', (ev) => {
       if (!arrastreTactil || arrastreTactil.id !== ev.pointerId) return;
       ev.preventDefault();
-      Render3D.orbita((arrastreTactil.x - ev.clientX) * 0.010);
+      const factor = window.OPTS.camaraInvertir ? 1 : -1;
+      const sensMult = (window.OPTS.camaraSens !== undefined ? window.OPTS.camaraSens : 100) / 100;
+      Render3D.orbita(factor * (arrastreTactil.x - ev.clientX) * 0.010 * sensMult);
       arrastreTactil.x = ev.clientX;
     }, { passive: false });
     function finArrastreTactil(ev) {
@@ -452,6 +536,7 @@
         teclas.add(ev.code);
       } else if (ev.code === 'KeyT' || ev.code === 'Enter') {
         ev.preventDefault();
+        if (document.pointerLockElement) document.exitPointerLock();
         Net.abrirChat();
       } else if (ev.code === 'Space') {
         ev.preventDefault();
@@ -461,11 +546,13 @@
         else Render3D.rotar(ev.code === 'KeyQ' ? 1 : -1);
       } else if (ev.code === 'KeyF') Net.luzToggle();
       else if (/^Digit[1-6]$/.test(ev.code)) Game.useItem(parseInt(ev.code.slice(5), 10) - 1);
-      else if (ev.code === 'KeyB') world.ui.toggleBackpack();
-      else if (ev.code === 'KeyL') world.ui.toggleLog();
-      else if (ev.code === 'KeyC') world.ui.toggleCodex();
-      else if (ev.code === 'KeyM' || ev.code === 'KeyN') Minimap.toggleBig();
+      else if (ev.code === 'KeyB') { if (document.pointerLockElement) document.exitPointerLock(); world.ui.toggleBackpack(); }
+      else if (ev.code === 'KeyL') { if (document.pointerLockElement) document.exitPointerLock(); world.ui.toggleLog(); }
+      else if (ev.code === 'KeyC') { if (document.pointerLockElement) document.exitPointerLock(); world.ui.toggleCodex(); }
+      else if (ev.code === 'KeyM' || ev.code === 'KeyN') { if (document.pointerLockElement) document.exitPointerLock(); Minimap.toggleBig(); }
       else if (ev.code === 'Escape') {
+        if (ev.repeat) return;
+        if (document.pointerLockElement) { document.exitPointerLock(); return; }
         if (Minimap.visible) Minimap.toggleBig(false);
         else if (document.getElementById('backpack-panel').style.display !== 'none') world.ui.toggleBackpack(false);
         else if (sndMenu.style.display !== 'none') cerrarSndMenu();

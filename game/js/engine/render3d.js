@@ -25,6 +25,7 @@
   let renderer, scene, camera, amb, plight, spot, dlight;
   let ceilingLights = [];
   let composer = null;           // postprocesado (bloom + gamma); null => render directo
+  let bloomPass = null;          // pase de bloom para el pulso dinámico por cordura baja
   let fogBase = 0.08;
   let glCanvas, overlay, octx, W, H;
   let levelKey = null;
@@ -96,11 +97,13 @@
       try {
         composer = new THREE.EffectComposer(renderer);
         composer.addPass(new THREE.RenderPass(scene, camera));
-        composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.4, 0.82));
+        bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(W, H), 0.55, 0.4, 0.82);
+        composer.addPass(bloomPass);
         composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
       } catch (e) {
         console.warn('Postpro desactivado:', e);
         composer = null;
+        bloomPass = null;
       }
     }
     amb = new THREE.AmbientLight(0xffffff, 0.4);
@@ -1419,9 +1422,45 @@
       renderer.toneMappingExposure = 0.96 - 0.05 * fase0;
     }
 
-    // luz del jugador con flicker fluorescente
+    // Cordura baja (v26.1, adaptado del PR #17): la niebla y el fondo se
+    // tiñen de púrpura/rojo oscuro y el bloom pulsa y baja de umbral —
+    // cuanto más cerca de 0, más se acerca el fluorescente al horror.
+    // baseFondo se recalcula ENTERO cada frame desde la paleta real del
+    // nivel (nunca desde scene.background ya mutado): si no, el tinte se
+    // realimentaría sobre sí mismo y jamás se recuperaría al subir la cordura.
+    const cordura = p.cordura ?? 100;
+    if (scene.fog && !window.NOFX) {
+      const baseFondo = new THREE.Color(world.level.paleta.fondo);
+      if (world.level.id === 'level-0') {
+        baseFondo.setRGB(0.051 + 0.015 * fase0, 0.043 + 0.025 * fase0, 0.02 + 0.04 * fase0);
+      }
+      if (cordura < 40) {
+        const sc = (40 - cordura) / 40;
+        const locuraFondo = new THREE.Color(0x13010b);
+        baseFondo.lerp(locuraFondo, sc * 0.85);
+      }
+      scene.background.copy(baseFondo);
+      scene.fog.color.copy(baseFondo);
+    }
+    if (bloomPass && !window.NOFX) {
+      let targetBloom = 0.55, targetThreshold = 0.4;
+      if (cordura < 40) {
+        const sc = (40 - cordura) / 40;
+        const pulso = Math.sin(t * 0.003) * 0.15 * sc;
+        targetBloom = 0.55 + sc * 0.65 + pulso;
+        targetThreshold = 0.4 - sc * 0.22;
+      }
+      bloomPass.strength = targetBloom;
+      bloomPass.threshold = targetThreshold;
+    }
+
+    // luz del jugador con flicker fluorescente (se intensifica con cordura baja)
     let flicker = 1;
-    if (!REDUCE_FLICKER && Math.random() < 0.012) flicker = 0.72;
+    if (!REDUCE_FLICKER) {
+      if (cordura < 45 && Math.random() < 0.03 + (45 - cordura) * 0.005) {
+        flicker = Math.random() < 0.35 ? 0.08 : 0.55; // parpadeo severo de locura
+      } else if (Math.random() < 0.012) flicker = 0.72;
+    }
     const luzJugador = world.level.id === 'level-0' ? 0.72 : 1.7;
     plight.intensity = plight.intensity * 0.85 + (luzJugador * flicker) * 0.15;
     plight.position.set(px, 1.6, pz);
@@ -1432,7 +1471,11 @@
     // solo) — antes usaba p.dir, que online nunca cambia, y el cono se quedaba
     // clavado mirando al sur como una luz fantasma.
     const luzOn = p.luz && !world.luzBloqueada;
-    spot.intensity += ((luzOn ? 2.4 : 0) - spot.intensity) * 0.12;
+    let spotFlicker = 1;
+    if (!REDUCE_FLICKER && cordura < 45 && Math.random() < 0.02 + (45 - cordura) * 0.004) {
+      spotFlicker = Math.random() < 0.4 ? 0.1 : 0.6; // parpadeo de linterna por locura
+    }
+    spot.intensity += (((luzOn ? 2.4 : 0) * spotFlicker) - spot.intensity) * 0.12;
     if (spot.intensity > 0.01) {
       let fx2 = 0, fz2 = 1;
       if (world.online) {
@@ -1446,18 +1489,26 @@
       spot.target.position.set(px + fx2 * 3.5, 0.2, pz + fz2 * 3.5);
       spot.target.updateMatrixWorld();
     }
-    if (scene.fog)
-      scene.fog.density += ((luzOn ? fogBase * 0.45 : fogBase) - scene.fog.density) * 0.06;
+    if (scene.fog) {
+      let targetFogBase = fogBase;
+      if (cordura < 50) {
+        const sc = (50 - cordura) / 50;
+        targetFogBase = fogBase * (1 + sc * 0.9); // hasta +90% de niebla (claustrofobia)
+      }
+      scene.fog.density += ((luzOn ? targetFogBase * 0.45 : targetFogBase) - scene.fog.density) * 0.06;
+    }
 
     // luminarias cercanas + polvo en suspensión
     if (window.Atmos3D) Atmos3D.frame(world, t, px, pz, luzOn);
 
     // Los paneles están repartidos en grupos sembrados. Cada fallo elige uno:
-    // parpadea una fracción del techo, nunca todos los fluorescentes a la vez.
+    // parpadea una fracción del techo, nunca todos los fluorescentes a la vez
+    // (la probabilidad sube con la cordura baja).
     if (panelMats.some(Boolean) && !window.NOFX && !REDUCE_FLICKER) {
       const baseCenital = world.level.id === 'level-0' ? 0.14 - 0.025 * fase0 : 0.35;
       if (!flkHasta) {
-        if (Math.random() < 0.0006) {
+        const probFlicker = cordura < 50 ? 0.0006 + (50 - cordura) * 0.0012 : 0.0006;
+        if (Math.random() < probFlicker) {
           flkHasta = t + 600 + Math.random() * 1000;
           flkNext = 0;
           const activos = panelMats.map((m, i) => m ? i : -1).filter((i) => i >= 0);
@@ -1572,6 +1623,21 @@
         0.09
       );
       camera.lookAt(frame._look);
+    }
+
+    // Temblor de cámara por pánico con cordura muy baja
+    if (cordura < 30 && !REDUCE_FLICKER) {
+      const sc = (30 - cordura) / 30;
+      const shakeAmp = 0.018 * sc;
+      camera.position.x += (Math.random() - 0.5) * shakeAmp;
+      camera.position.y += (Math.random() - 0.5) * shakeAmp;
+      camera.position.z += (Math.random() - 0.5) * shakeAmp;
+      if (frame._look) {
+        frame._look.x += (Math.random() - 0.5) * shakeAmp * 1.5;
+        frame._look.y += (Math.random() - 0.5) * shakeAmp * 1.5;
+        frame._look.z += (Math.random() - 0.5) * shakeAmp * 1.5;
+        camera.lookAt(frame._look);
+      }
     }
 
     if (composer && !window.NOFX) {
