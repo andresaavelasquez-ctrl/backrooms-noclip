@@ -20,6 +20,18 @@ function cardinalDe(th) {
   return [[0, -1], [1, 0], [0, 1], [-1, 0]][k];
 }
 const r2 = (v) => Math.round(v * 100) / 100;
+const SALA_PUBLICA = 'publica';
+const RE_GRUPO_PRIVADO = /^[a-z0-9_-]{3,32}$/;
+
+function grupoSala(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  return s && RE_GRUPO_PRIVADO.test(s) ? s : SALA_PUBLICA;
+}
+
+function claveInterna(nivelId, inst, grupo) {
+  grupo = grupoSala(grupo);
+  return `${grupo}::${nivelId}::${inst}`;
+}
 
 // ¿Se puede ir de A a B sin cruzar nada sólido? Muestreo cada ~0.2 tiles con
 // radio tolerante (0.22 vs 0.35 del cuerpo): los puntos reportados ya pasaron
@@ -40,12 +52,16 @@ function destinoDisponible(def) {
 }
 
 class Sala {
-  constructor(nivelId, inst) {
+  constructor(nivelId, inst, grupo = SALA_PUBLICA) {
     this.nivelId = nivelId;
     this.inst = inst;
-    this.clave = `${nivelId}::${inst}`;
+    this.grupo = grupoSala(grupo);
+    this.privada = this.grupo !== SALA_PUBLICA;
+    this.clave = this.privada ? `${nivelId}::privada::${inst}` : `${nivelId}::${inst}`;
     // La semilla es el contrato con el cliente: mismo string → mismo mapa.
-    this.semilla = `mmo::${nivelId}::${inst}`;
+    this.semilla = this.privada
+      ? `mmo::privada::${this.grupo}::${nivelId}::${inst}`
+      : `mmo::${nivelId}::${inst}`;
     const { def, map } = generarMapa(nivelId, this.semilla);
     this.def = def;
     this.map = map;
@@ -116,7 +132,7 @@ class Sala {
     this.prepararCaminata(jug);
     this.enviar(ws, {
       t: 'bienvenida', id, nivel: this.nivelId, inst: this.inst,
-      semilla: this.semilla, x, y, rot: jug.rot, sec: 0,
+      semilla: this.semilla, privada: this.privada, x, y, rot: jug.rot, sec: 0,
       salud: jug.salud, inv: jug.inv, manos: jug.manos,
       caminata: jug.caminataObjetivo ? { pasos: 0, objetivo: jug.caminataObjetivo } : null,
       jugadores: this.censo(), ...this.estadoDinamico(),
@@ -671,16 +687,20 @@ class Sala {
 // ---------- registro de salas ----------
 const salas = new Map();
 
-function asignar(nivelId) {
+function crearSala(nivelId, inst, grupo) {
+  const sala = new Sala(nivelId, inst, grupo);
+  salas.set(claveInterna(nivelId, inst, grupo), sala);
+  console.log(`[sala] abierta ${sala.clave} (${sala.map.grid.w}×${sala.map.grid.h}, ${sala.entidades.length} entidades)`);
+  return sala;
+}
+
+function asignar(nivelId, grupo = SALA_PUBLICA) {
+  grupo = grupoSala(grupo);
   let inst = 1;
   for (;;) {
-    const clave = `${nivelId}::${inst}`;
+    const clave = claveInterna(nivelId, inst, grupo);
     let sala = salas.get(clave);
-    if (!sala) {
-      sala = new Sala(nivelId, inst);
-      salas.set(clave, sala);
-      console.log(`[sala] abierta ${clave} (${sala.map.grid.w}×${sala.map.grid.h}, ${sala.entidades.length} entidades)`);
-    }
+    if (!sala) sala = crearSala(nivelId, inst, grupo);
     if (!sala.llena) return sala;
     inst++;
   }
@@ -707,7 +727,7 @@ function estado() {
     ? metricas.medias.reduce((a, b) => a + b, 0) / metricas.medias.length : 0;
   return {
     salas: [...salas.values()].map((s) => ({
-      clave: s.clave, jugadores: s.jugadores.size,
+      clave: s.clave, privada: s.privada, jugadores: s.jugadores.size,
       entidades: s.entidades.filter((e) => e.viva).length,
     })),
     total: [...salas.values()].reduce((n, s) => n + s.jugadores.size, 0),
@@ -727,4 +747,4 @@ setInterval(() => {
 
 function todas() { return [...salas.values()]; }
 
-module.exports = { Sala, asignar, tickTodas, estado, todas };
+module.exports = { Sala, asignar, tickTodas, estado, todas, SALA_PUBLICA };

@@ -48,6 +48,9 @@ html, body { height: 100%; background: #060504; color: var(--hueso);
 .seed-row { margin-bottom: 18px; color: var(--gris); font-size: 16px; }
 .seed-row input { background: #0a0906; border: 1px solid var(--borde); color: var(--amarillo);
   font-family: inherit; font-size: 16px; padding: 6px 10px; width: 180px; }
+.room-row { margin: -4px 0 18px; color: var(--gris); font-size: 15px; }
+.room-row input { background: #0a0906; border: 1px solid var(--borde); color: var(--amarillo);
+  font-family: inherit; font-size: 15px; padding: 6px 10px; width: 180px; }
 .hint { margin-top: 26px; color: #6a6455; font-size: 15px; line-height: 1.7; }
 
 .btn-big { display: inline-block; background: var(--amarillo-osc); color: #0a0906;

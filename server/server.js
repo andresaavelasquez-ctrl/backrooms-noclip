@@ -22,6 +22,13 @@ const ADMIN_CLAVE = process.env.MMO_ADMIN ||
 const PUERTO = parseInt(process.argv[2], 10) || 8080;
 const RAIZ = path.join(__dirname, '..', 'game');
 const NIVEL_INICIAL = 'level-0';
+const RE_SALA_PRIVADA = /^[a-z0-9_-]{3,32}$/;
+
+function codigoSalaPrivada(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+  return RE_SALA_PRIVADA.test(s) ? s : false;
+}
 
 // ---------- estáticos (sin dependencias: mimetipos a mano) ----------
 const MIME = {
@@ -99,11 +106,17 @@ wss.on('connection', (ws, req) => {
       const nombre = filtro.nombreLimpio(m.nombre);
       const expediente = db.conectar(m.token, nombre);
       if (expediente.baneado) { ws.close(1008, 'baneado'); return; }
+      const salaPrivada = codigoSalaPrivada(m.sala);
+      if (salaPrivada === false) {
+        sala2enviar(ws, { t: 'error', txt: 'Código de sala privada inválido. Usa 3-32 letras, números, _ o -.' });
+        ws.close(1008, 'sala');
+        return;
+      }
       // puerta de desarrollo (?nivel=): SOLO con MMO_DEV=1 — en producción
       // todo el mundo despierta en Level 0, como manda el lore
       const devOk = process.env.MMO_DEV === '1';
       const nivel = devOk && m.nivel && DATA.levels[m.nivel] ? m.nivel : NIVEL_INICIAL;
-      sala = asignar(nivel);
+      sala = asignar(nivel, salaPrivada || undefined);
       prepararSala(sala);
       jug = sala.entrar(ws, nombre, m.token, expediente);
       jug._reSala = (s) => { sala = s; };  // el cruce actualiza la sala del socket
@@ -165,7 +178,7 @@ function esSinRetorno(def) {
 // mandar el estado nuevo (el cliente reconstruye el mapa desde la semilla)
 function cambiarDeSala(jug, salaVieja, defSalida, opts) {
   salaVieja.salir(jug);
-  const nueva = asignar(defSalida.destino);
+  const nueva = asignar(defSalida.destino, salaVieja.grupo);
   prepararSala(nueva);
   // ---------- puerta de RETORNO (v23): la puerta que cruzaste te espera ----------
   // salvo que llegaras cayendo/por el vacío/noclip (caminata o /tp): de ahí no se vuelve
@@ -199,7 +212,7 @@ function cambiarDeSala(jug, salaVieja, defSalida, opts) {
   const id = jug.id;
   nueva.jugadores.set(id, jug);
   nueva.enviar(jug.ws, {
-    t: 'nivel', nivel: nueva.nivelId, inst: nueva.inst, semilla: nueva.semilla,
+    t: 'nivel', nivel: nueva.nivelId, inst: nueva.inst, semilla: nueva.semilla, privada: nueva.privada,
     x, y, rot: jug.rot, sec: jug.sec, via: defSalida.texto,
     sinTarjeta: !!(opts && opts.sinTarjeta),
     salud: jug.salud, inv: jug.inv, manos: jug.manos,

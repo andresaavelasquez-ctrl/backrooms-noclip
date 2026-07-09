@@ -22,6 +22,7 @@
   let rtt = 100;         // ms ida y vuelta (medido con ping/pong; telemetría)
   let pingTimer = null;
   let ultimoError = null; // último rechazo del servidor (lo muestra el título)
+  let salaActual = null;
   let pasoAcum = 0;       // distancia andada desde el último sonido de paso
   const r2 = (v) => Math.round(v * 100) / 100;
 
@@ -63,13 +64,16 @@
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
   }
 
-  function iniciar(nombre) {
+  function iniciar(nombre, sala) {
     const w = Game.world;
     const params = new URLSearchParams(location.search);
+    salaActual = sala || null;
+    ultimoError = null;
     ws = new WebSocket(urlServidor());
     ws.onopen = () => enviar({
       t: 'hola', nombre, token: token(), v: 7, // debe coincidir con protocolo.js
       nivel: params.get('nivel') || undefined, // puerta de desarrollo (solo MMO_DEV=1)
+      sala: salaActual || undefined,
     });
     ws.onmessage = (ev) => {
       let m;
@@ -86,9 +90,10 @@
         ultimoError = 'El juego se actualizó y tu navegador cargó una versión vieja. Pulsa Ctrl+F5.';
         return; // reintentar con el mismo código viejo no lleva a nada
       }
+      if (ev && ev.reason === 'sala') return;
       if (w.level) w.log('Conexión perdida con las Backrooms… reintentando.', 'danger');
       clearTimeout(reintento);
-      reintento = setTimeout(() => iniciar(nombre), 3000);
+      reintento = setTimeout(() => iniciar(nombre, salaActual), 3000);
     };
     ws.onerror = () => { ultimoError = ultimoError || 'No se pudo conectar con el servidor.'; };
     // medición de RTT: alimenta la reconciliación y el retardo de interpolación
