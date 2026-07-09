@@ -183,13 +183,16 @@
   window.addEventListener('orientationchange', () => setTimeout(ajustarLienzo, 140));
   ajustarLienzo();
 
-  // ---------- cámara libre con el RATÓN (v25, online 3ªP): mantener y arrastrar ----------
+  // ---------- cámara libre con el RATÓN (v25, online 3ªP): CLIC DERECHO y
+  // arrastrar, al estilo Roblox (v26.1: antes cualquier botón, y con el
+  // sentido del giro invertido respecto a lo esperado) ----------
   {
     const wrap = document.getElementById('game-wrap');
     let arrastre = null;
     let arrastreTactil = null;
     wrap.addEventListener('contextmenu', (ev) => ev.preventDefault());
     wrap.addEventListener('mousedown', (ev) => {
+      if (ev.button !== 2) return; // solo clic derecho
       if (!world.online || !use3D || Render3D.modo !== 'tercera') return;
       if (ev.target.closest('button, input, select, #backpack-panel, #log-panel')) return;
       arrastre = ev.clientX;
@@ -197,7 +200,7 @@
     });
     window.addEventListener('mousemove', (ev) => {
       if (arrastre === null) return;
-      Render3D.orbita((ev.clientX - arrastre) * 0.0085);
+      Render3D.orbita((arrastre - ev.clientX) * 0.0085);
       arrastre = ev.clientX;
     });
     window.addEventListener('mouseup', () => {
@@ -216,7 +219,7 @@
     wrap.addEventListener('pointermove', (ev) => {
       if (!arrastreTactil || arrastreTactil.id !== ev.pointerId) return;
       ev.preventDefault();
-      Render3D.orbita((ev.clientX - arrastreTactil.x) * 0.010);
+      Render3D.orbita((arrastreTactil.x - ev.clientX) * 0.010);
       arrastreTactil.x = ev.clientX;
     }, { passive: false });
     function finArrastreTactil(ev) {
