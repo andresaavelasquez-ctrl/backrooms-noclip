@@ -35,6 +35,10 @@ function caminoLegal(grid, x0, y0, x1, y1) {
   return true;
 }
 
+function destinoDisponible(def) {
+  return def && def.destino && DATA.levels[def.destino];
+}
+
 class Sala {
   constructor(nivelId, inst) {
     this.nivelId = nivelId;
@@ -129,7 +133,7 @@ class Sala {
   prepararCaminata(jug) {
     jug.pasosSala = 0;
     jug.distSala = 0;
-    jug.caminataObjetivo = (this.map.caminatas || []).length
+    jug.caminataObjetivo = (this.map.caminatas || []).some(destinoDisponible)
       ? MapGen.walkingGoal(this.def, `${jug.token}::${this.clave}`, 1, 0)
       : 0;
   }
@@ -190,8 +194,12 @@ class Sala {
       if (pasos % 20 === 0 || pasos >= jug.caminataObjetivo)
         this.enviar(jug.ws, { t: 'caminata', pasos, objetivo: jug.caminataObjetivo });
       if (pasos >= jug.caminataObjetivo) {
-        const defC = this.map.caminatas[0];
-        if (!defC) return;
+        const defC = (this.map.caminatas || []).find(destinoDisponible);
+        if (!defC) {
+          jug.caminataObjetivo = 0;
+          this.enviar(jug.ws, { t: 'aviso', txt: 'Ese camino no lleva a ninguna parte (nivel fuera del piloto).' });
+          return;
+        }
         if (this.alCruzar) this.alCruzar(jug, this, defC, { sinTarjeta: true });
       }
     }
