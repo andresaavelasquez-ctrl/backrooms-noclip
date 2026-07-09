@@ -107,7 +107,8 @@
       case 'oscuridad': return dd <= radio && ver() && playerInDark(world);
       case 'luz': return world.player.luz && dd <= radio &&
         !(world.instinto && world.instinto('piel_fluorescente')); // te creen una luz más
-      case 'adyacente': return dd <= (d.radio || 1);
+      case 'adyacente':
+      case 'contacto': return dd <= (d.radio || 1);
       case 'sigilo': return dd <= radio && ver();
       case 'global': return true;
       default: return dd <= Math.max(1, 6 + rMod) && ver();
@@ -220,11 +221,13 @@
         if (e.dormida === 12) world.log('Oyes pasos lejanos entre los pasillos…', 'event');
         if (e.dormida === 4) world.log('Los pasos se aceleran. Vienen hacia ti.', 'event');
         if (e.dormida === 0) {
+          e.estado = 'caza';
           world.log('EL CAZADOR TE HA ENCONTRADO.', 'danger');
           if (window.Sfx) Sfx.cue('hunter');
         }
         return;
       }
+      e.estado = 'caza';
       // escondido y sin delatar: el Cazador ronda tu último rastro, no te ve
       if (world.escondido && !world.escondido.delatado && !detecta(world, e, rng)) {
         stepRandom(world, e, rng);
@@ -280,7 +283,7 @@
     const rd = world.ruido;
     if (rd && e.estado !== 'caza' &&
         Math.abs(e.x - rd.x) + Math.abs(e.y - rd.y) <= rd.radio) {
-      if (adjacentToPlayer(world, e)) { atacar(world, e, rng); return; }
+      if (adjacentToPlayer(world, e) && (!world.escondido || detectado)) { atacar(world, e, rng); return; }
       e.estado = 'alerta';
       stepHacia(world, e, rd.x, rd.y);
       if (e.def.velocidad > 1) stepHacia(world, e, rd.x, rd.y);
@@ -288,8 +291,9 @@
     }
 
     const vel = e.def.velocidad;
+    const puedeAtacar = !world.escondido || detectado;
     for (let paso = 0; paso < vel; paso++) {
-      if (adjacentToPlayer(world, e)) { atacar(world, e, rng); return; }
+      if (adjacentToPlayer(world, e) && puedeAtacar) { atacar(world, e, rng); return; }
       if (e.estado === 'caza') stepToward(world, e);
       else if (comp === 'errante' || e.estado === 'alerta') {
         if (paso === 0) stepRandom(world, e, rng);
@@ -297,10 +301,10 @@
         if (paso === 0 && rng.chance(0.5)) stepRandom(world, e, rng);
       }
     }
-    if (adjacentToPlayer(world, e) && e.estado === 'caza') atacar(world, e, rng);
+    if (adjacentToPlayer(world, e) && e.estado === 'caza' && puedeAtacar) atacar(world, e, rng);
 
     // los errantes hostiles solo atacan si los tocas de cerca mucho tiempo
-    if (comp === 'errante' && adjacentToPlayer(world, e) && rng.chance(0.25)) atacar(world, e, rng);
+    if (comp === 'errante' && adjacentToPlayer(world, e) && puedeAtacar && rng.chance(0.25)) atacar(world, e, rng);
   }
 
   function stepAll(world, rng) {
