@@ -622,6 +622,8 @@
     else if (def.tipo === 'arriesgada' && def.riesgoVoid > 0)
       warn.textContent = `⚠ Camino inestable (riesgo de caer al Vacío) → ${destinoNombre ?? '???'}`;
     else warn.textContent = destinoNombre ? `→ ${destinoNombre}` : '→ ¿?';
+    // showLevelPicker oculta CRUZAR; si se eligió nivel (no «quedarse»), nadie lo restauraba
+    $('btn-cross').style.display = '';
     $('btn-cross').onclick = () => { hideExitModal(); Game.crossExit(def); };
     $('btn-stay').onclick = hideExitModal;
   }
