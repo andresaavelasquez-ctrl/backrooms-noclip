@@ -28,8 +28,11 @@
   Sprites.tryOverrides([
     ...Sprites.list(),
     ...Object.values(world.data.entities).map((e) => e.glyph),
+    ...Sprites.CAPA_MASCARA_GAS,
     ...Object.keys(world.data.objects),
   ]);
+  // iconos PNG personalizados (game/assets/icons/) si existen
+  if (window.Icons) Icons.tryOverrides(Icons.list());
 
   // ---------- input ----------
   const KEYS = {
