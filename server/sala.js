@@ -258,9 +258,12 @@ class Sala {
     const ahora = Date.now();
     const dt = Math.min(1.5, (ahora - (jug._posT ?? ahora)) / 1000);
     jug._posT = ahora;
-    jug._margen = Math.min(1.3, (jug._margen ?? 0.8) + dt * Fisica.VEL_JUGADOR * 1.12);
+    // El cliente integra hasta 0.6 s tras un microparón y envía el rastro en
+    // tramos cortos. La cubeta guarda ese presupuesto, pero cada informe sigue
+    // limitado a 1.3 tiles para que un salto grande no pase por teleport válido.
+    jug._margen = Math.min(3.2, (jug._margen ?? 0.8) + dt * Fisica.VEL_JUGADOR * 1.12);
     const d = Fisica.dist(jug.x, jug.y, m.x, m.y);
-    const excesoVel = d > jug._margen;
+    const excesoVel = d > 1.3 || d > jug._margen;
     if (excesoVel || !caminoLegal(this.map.grid, jug.x, jug.y, m.x, m.y)) {
       if (jug.rechazos) jug.rechazos[excesoVel ? 'vel' : 'muro']++;
       jug.sec = (jug.sec || 0) + 1;
