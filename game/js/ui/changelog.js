@@ -4,6 +4,9 @@
 // tanda de cambios (junto con VERSION_JUEGO en main.js).
 (function () {
   const CHANGELOG = [
+    { v: 'v28.1', cambios: [
+      'El jugador, las entidades, los jugadores remotos y los objetos del suelo ahora tienen volumen real en 3D (como las herramientas extruidas de Minecraft) en vez de ser recortes planos — se nota sobre todo al mover la cámara alrededor.',
+    ] },
     { v: 'v28.0', cambios: [
       'Arreglado (multijugador): las salidas de destino aleatorio a veces daban "nivel fuera del piloto" en vez de cruzar de verdad.',
       'Arreglado (multijugador): las entidades y el propio jugador podían no verse en el render 2D clásico.',
