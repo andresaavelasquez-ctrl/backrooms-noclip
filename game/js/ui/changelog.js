@@ -4,6 +4,18 @@
 // tanda de cambios (junto con VERSION_JUEGO en main.js).
 (function () {
   const CHANGELOG = [
+    { v: 'v28.0', cambios: [
+      'Arreglado (multijugador): las salidas de destino aleatorio a veces daban "nivel fuera del piloto" en vez de cruzar de verdad.',
+      'Arreglado (multijugador): las entidades y el propio jugador podían no verse en el render 2D clásico.',
+      'Arreglado: los sonidos MP3 propios ahora respetan el volumen de Efectos.',
+      'Música ambiental real para Level 2 y Level 15, y nuevos efectos de sonido (dado, pasos, registrar contenedores).',
+      'Música de menú en la pantalla de título, con selector para cambiarla o silenciarla.',
+      'Nueva opción de cámara "bloqueada": sigue automáticamente detrás del personaje al caminar hacia adelante.',
+      'Nuevo selector de resolución interna y de límite de FPS en Ajustes.',
+      'La interfaz ya no se recorta en pantallas bajas: los paneles hacen scroll si hace falta.',
+      'El Changelog y el Códice ahora se cierran con ESC o con un botón "X", además de su botón de siempre.',
+      'Nuevos sprites propios para 11 objetos del inventario.',
+    ] },
     { v: 'v27.11', cambios: [
       'Arreglado (multijugador): un pequeño tirón o parón del navegador podía hacerte "rebotar" hacia atrás al moverte.',
     ] },
