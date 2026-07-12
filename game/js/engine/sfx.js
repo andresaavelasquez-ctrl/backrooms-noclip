@@ -238,7 +238,7 @@
     try {
       if (muted) return;
       const ov = overrides[nombre];
-      if (ov) { const el = ov.cloneNode(); el.volume = vol; el.play().catch(() => {}); return; }
+      if (ov) { const el = ov.cloneNode(); el.volume = Math.min(1, vol * volFx); el.play().catch(() => {}); return; }
       if (!ctx) return;
       SYNTH[nombre]?.(arg);
     } catch (e) {}
