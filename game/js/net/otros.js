@@ -211,7 +211,8 @@
     const p = world?.player;
     for (const o of porId.values()) {
       if (o.escondido) continue; // dentro de una taquilla no hay nombre que leer
-      const [sx, sy] = proj(o.rx, o.ry);
+      const [sx, sy, detras] = proj(o.rx, o.ry);
+      if (detras) continue;
       if (sx < -80 || sy < -80 || sx > ctx.canvas.width + 80 || sy > ctx.canvas.height + 80) continue;
       // capa social de PROXIMIDAD: de lejos ves una figura, no sabes quién es
       const cercano = p && Math.hypot(o.rx - p.rx, o.ry - p.ry) <= RADIO_SOCIAL;

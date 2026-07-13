@@ -1762,7 +1762,10 @@
 
   function project(wx, wy) {
     const v = new THREE.Vector3(wx + 0.5, 0.8, wy + 0.5).project(camera);
-    return [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H];
+    // v.z > 1 tras project(): el punto queda detrás de la cámara (la
+    // división de perspectiva por w negativa lo puede devolver dentro del
+    // rango de pantalla en vez de fuera) — quien llama debe ignorarlo
+    return [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H, v.z > 1];
   }
 
   function drawOverlay(world, t) {
