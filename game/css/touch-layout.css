@@ -1,0 +1,262 @@
+/*
+ * Controles táctiles configurables para BACKROOMS MMO.
+ * Mantiene intacta la entrada del juego: solo organiza y presenta los controles.
+ */
+
+:root {
+  --touch-control-scale: 1;
+  --touch-control-opacity: .74;
+}
+
+/* El tamaño usa la propiedad scale para no interferir con el transform del stick.
+   En modo individual se escala cada control, no sus contenedores: un contenedor
+   transformado cambia el sistema de coordenadas de sus hijos position:fixed y
+   podía hacer que los botones desaparecieran al entrar en «Mover uno a uno». */
+#touch-controls:not(.touch-layout-individual) .touch-joystick,
+#touch-controls:not(.touch-layout-individual) .touch-dpad,
+#touch-controls:not(.touch-layout-individual) .touch-actions {
+  scale: var(--touch-control-scale);
+  transform-origin: center;
+}
+
+#touch-controls.touch-layout-individual .touch-joystick,
+#touch-controls.touch-layout-individual .touch-dpad button,
+#touch-controls.touch-layout-individual .touch-actions button {
+  scale: var(--touch-control-scale);
+  transform-origin: center;
+}
+
+#touch-controls.touch-layout-individual .touch-dpad,
+#touch-controls.touch-layout-individual .touch-actions {
+  scale: 1;
+  transform: none;
+}
+
+#touch-controls .joy-base,
+#touch-controls .touch-dpad button,
+#touch-controls .touch-actions button {
+  opacity: var(--touch-control-opacity);
+}
+
+/* Posiciones guardadas por el personalizador. */
+#touch-controls .touch-layout-positioned {
+  position: fixed !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+
+#touch-controls.touch-layout-individual .touch-actions,
+#touch-controls.touch-layout-individual .touch-dpad {
+  width: 0;
+  height: 0;
+  gap: 0;
+}
+
+#touch-controls.touch-layout-individual .touch-actions button,
+#touch-controls.touch-layout-individual .touch-dpad button {
+  position: fixed !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: translate(-50%, -50%);
+}
+
+#touch-controls.touch-layout-individual .touch-actions button:active,
+#touch-controls.touch-layout-individual .touch-dpad button:active {
+  transform: translate(-50%, -50%) scale(.96);
+}
+
+/* Editor: los controles dejan de ejecutar acciones y se vuelven agarradores. */
+body.touch-layout-editing #touch-controls {
+  display: flex !important;
+  pointer-events: none;
+}
+
+body.touch-layout-editing #touch-controls .touch-joystick,
+body.touch-layout-editing #touch-controls .touch-dpad,
+body.touch-layout-editing #touch-controls .touch-actions,
+body.touch-layout-editing #touch-controls button,
+body.touch-layout-editing #touch-controls .joy-base {
+  opacity: 1 !important;
+}
+
+body.touch-layout-editing #touch-controls .touch-layout-drag-target,
+body.touch-layout-editing #touch-controls .touch-layout-drag-target button,
+body.touch-layout-editing #touch-controls .touch-layout-drag-target .joy-base {
+  pointer-events: auto !important;
+  cursor: move;
+  outline: 2px dashed var(--amarillo);
+  outline-offset: 4px;
+  box-shadow: 0 0 18px rgba(217, 198, 110, .45);
+}
+
+#touch-layout-toolbar {
+  position: fixed;
+  left: 50%;
+  top: max(10px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 100002;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: rgba(10, 9, 6, .94);
+  border: 1px solid var(--amarillo-osc);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .72);
+  color: var(--hueso);
+  font: 14px var(--font-body);
+  white-space: nowrap;
+}
+
+body.touch-layout-editing #touch-layout-toolbar { display: flex; }
+
+#touch-layout-toolbar button,
+#touch-layout-menu button {
+  touch-action: manipulation;
+}
+
+#touch-layout-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  background: rgba(0, 0, 0, .82);
+}
+
+#touch-layout-menu.is-open { display: flex; }
+
+#touch-layout-menu .modal-box {
+  width: min(560px, 96vw);
+  max-height: min(90dvh, 680px);
+  overflow: auto;
+}
+
+.touch-layout-section {
+  border-top: 1px dashed var(--borde);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.touch-layout-section h4 {
+  color: var(--amarillo);
+  font: 12px var(--font-title);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.touch-layout-preset-grid,
+.touch-layout-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.touch-layout-preset-grid .btn-small,
+.touch-layout-editor-grid .btn-small {
+  width: 100%;
+  margin-top: 0;
+}
+
+#row-touch-layout { display: none; }
+
+@media (pointer: coarse) {
+  #row-touch-layout { display: flex; }
+}
+
+body.touch-preview #row-touch-layout { display: flex; }
+body.touch-preview.game-active #touch-controls { display: flex; }
+
+/* Acceso directo al chat del MMO junto a Ajustes y Registro. */
+#btn-chat-touch {
+  display: none;
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: calc(max(8px, env(safe-area-inset-left)) + 72px);
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 12;
+  background: rgba(10, 9, 6, .72);
+  border: 1px solid var(--borde);
+  color: var(--hueso);
+  font: 11px var(--font-title);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#btn-chat-touch.is-visible { display: flex; }
+#btn-chat-touch:active { border-color: var(--amarillo); color: var(--amarillo); }
+
+@media (pointer: coarse) {
+  body.game-active #game-log {
+    left: calc(max(8px, env(safe-area-inset-left)) + 110px);
+  }
+}
+
+body.touch-preview.game-active #game-log {
+  left: calc(max(8px, env(safe-area-inset-left)) + 110px);
+}
+
+/* Pantalla completa real en móviles ultrapanorámicos, sin letterbox lateral. */
+@media (pointer: coarse) {
+  body.touch-fill-screen #screen-game {
+    position: fixed;
+    inset: 0;
+    width: 100dvw;
+    height: 100dvh;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  body.touch-fill-screen #game-wrap {
+    width: 100dvw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: hidden;
+  }
+
+  body.touch-fill-screen #game-canvas,
+  body.touch-fill-screen #gl-canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+body.touch-preview.touch-fill-screen #screen-game {
+  position: fixed;
+  inset: 0;
+  width: 100dvw;
+  height: 100dvh;
+  padding: 0 !important;
+  overflow: hidden;
+}
+body.touch-preview.touch-fill-screen #game-wrap {
+  width: 100dvw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+body.touch-preview.touch-fill-screen #game-canvas,
+body.touch-preview.touch-fill-screen #gl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 540px) {
+  .touch-layout-preset-grid,
+  .touch-layout-editor-grid { grid-template-columns: 1fr; }
+  #touch-layout-toolbar .touch-layout-toolbar-label { display: none; }
+}
