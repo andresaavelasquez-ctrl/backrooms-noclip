@@ -363,6 +363,15 @@ siguen la acción gratis), cámara CENITAL en render3d (rueda = altura vía `Ren
 objetivo, `dejarDeEspectar` con aviso. Test: `server/test-espectador.js` (22 asserts, ws
 real). OJO: subir protocolo obliga a `v:` en cliente.js, bots.js y TODOS los test-*.js.
 
+**v30.3 — árboles 3D en los bosques**: en render3d.js la rama orgánica de `construirEstatica`
+ya no usa billboards para `wallStyle === 'arbol'` (L45/186/626/6.1): cada casilla de pared
+genera un árbol seco 3D — prismas cuadrados que se afilan (`rama`) con crecimiento recursivo
+(`crecer`, 1-3 hijas por rama, prof 3 o 2 si la casilla está rodeada de arboleda), corteza
+`p-corteza` con la paleta del nivel, decal de sombra a los pies y todo determinista por
+casilla vía `seededUnit`. Fusionado por bandas (flush cada 8 filas) como los muros; SIN
+`castShadow` (el PointLight pintaba manchones negros sobre miles de ramas finas). Las rocas
+de `exterior` siguen siendo billboards.
+
 (Todos existen y están committeados. v3: render cenital con paredes finas autotile en `tiles.js`/`render.js`,
 pixel-art data-driven en `sprites.js` con override PNG desde `game/assets/sprites/`, efectos de combate
 en `effects.js`, props/contenedores registrables en `mapgen.js`/`game.js`.)
