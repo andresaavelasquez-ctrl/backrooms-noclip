@@ -10,7 +10,10 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const P = require('./protocolo');
 const filtro = require('./filtro');
-const { asignar, tickTodas, estado, totalJugadores, observa, chatReciente } = require('./sala');
+const {
+  asignar, tickTodas, estado, totalJugadores, observa, chatReciente,
+  prepararSala, cambiarDeSala, moverEspectador,
+} = require('./sala');
 const { DATA } = require('./sim/mundo');
 const db = require('./db');
 
@@ -358,114 +361,9 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => {});
 });
 
-function prepararSala(sala) {
-  sala.alCruzar = cambiarDeSala;
-  sala.alMorir = (jug, salaVieja, causa) => cambiarDeSala(jug, salaVieja, {
-    destino: 'level-0',
-    texto: `Moriste (${causa}). Despiertas otra vez sobre la moqueta húmeda, con las manos vacías.`,
-  }, { sinRetorno: true });
-}
-
-// salidas de las que físicamente NO se puede volver — la MISMA regla que
-// esSinRetorno en game.js (caídas, vacío, desplomes) para que el mundo
-// online respete la física del modo original
-function esSinRetorno(def) {
-  if (def.sinRetorno) return true;
-  if (def.tipo === 'void') return true;
-  return /agujero|caes |caer |caída|desplom|abismo|pozo|trampilla|no.?clip|desmay|despiert/i.test(def.texto || '');
-}
-
-// cruce de salas: sacar de la sala vieja, meter en la del nivel destino y
-// mandar el estado nuevo (el cliente reconstruye el mapa desde la semilla)
-function cambiarDeSala(jug, salaVieja, defSalida, opts) {
-  salaVieja.salir(jug);
-  const nueva = asignar(defSalida.destino, salaVieja.grupo);
-  prepararSala(nueva);
-  // ---------- puerta de RETORNO (v23): la puerta que cruzaste te espera ----------
-  // salvo que llegaras cayendo/por el vacío/noclip (caminata o /tp): de ahí no se vuelve
-  const origen = salaVieja.nivelId;
-  const conRetorno = !(opts && opts.sinRetorno) && !(opts && opts.sinTarjeta) &&
-    !esSinRetorno(defSalida) && origen !== nueva.nivelId;
-  jug.retorno = null;
-  // cruzar por aquí SIEMPRE devuelve al mundo (un espectador viaja por
-  // moverEspectador): si un guardián espectando usa /tp, el flag no puede
-  // sobrevivir en el servidor con el cliente ya fuera del modo
-  jug.espectador = null;
-  let x, y;
-  const iVuelta = conRetorno
-    ? nueva.map.exits.findIndex((e) => e.def.destino === origen) : -1;
-  if (iVuelta >= 0) {
-    // el nivel ya tiene la puerta que conecta de vuelta: apareces a su lado
-    const ex = nueva.map.exits[iVuelta];
-    [x, y] = nueva.buscarSpawn(ex.x, ex.y);
-    jug.ofertaEn = iVuelta; // no reabrir la oferta hasta alejarse y volver
-  } else {
-    [x, y] = nueva.buscarSpawn();
-    if (conRetorno) {
-      // puerta personal: SOLO tú la ves — es TU camino de vuelta
-      jug.retorno = { x, y, destino: origen };
-      jug.ofertaEn = 'R';
-    } else jug.ofertaEn = null;
-  }
-  jug.x = x; jug.y = y;
-  jug.canal = null; jug.escondido = null; jug.manila = null;
-  // teleport de sala: caducan los informes de posición en vuelo (v24)
-  jug.sec = (jug.sec || 0) + 1;
-  jug._posT = Date.now();
-  jug._margen = 0.8;
-  nueva.protegerPrimeraVisita(jug);
-  nueva.prepararCaminata(jug);
-  const id = jug.id;
-  nueva.jugadores.set(id, jug);
-  nueva.enviar(jug.ws, {
-    t: 'nivel', nivel: nueva.nivelId, inst: nueva.inst, semilla: nueva.semilla, privada: nueva.privada,
-    x, y, rot: jug.rot, sec: jug.sec, via: defSalida.texto,
-    sinTarjeta: !!(opts && opts.sinTarjeta),
-    salud: jug.salud, sed: jug.sed, cordura: jug.cordura, inv: jug.inv, manos: jug.manos, equipo: jug.equipo,
-    retorno: jug.retorno,
-    caminata: jug.caminataObjetivo ? { pasos: 0, objetivo: jug.caminataObjetivo } : null,
-    jugadores: nueva.censo(), ...nueva.estadoDinamico(),
-  });
-  nueva.difundir({ t: 'entra', id, nombre: jug.nombre, x, y, rot: jug.rot }, id);
-  if (jug.luz) nueva.difundir({ t: 'luzDe', id, si: true });
-  if (jug._reSala) jug._reSala(nueva);
-  db.registrarVisita(jug.token, nueva.nivelId);
-  if (nueva.def.esEscape) db.sumarEscape(jug.token);
-  console.log(`[→] ${jug.nombre}#${id} cruza a ${nueva.clave}`);
-  // v30: tus espectadores cruzan CONTIGO (invisibles) — cubre puertas,
-  // caminata, Sala Manila, /tp y el respawn tras la muerte
-  for (const esp of [...salaVieja.jugadores.values()])
-    if (esp.espectador && esp.espectador.objetivo === id)
-      moverEspectador(esp, salaVieja, nueva, jug);
-}
-
-// ---------- modo espectador del guardián (v30) ----------
-// Mueve a un espectador a la MISMA instancia que su objetivo (sin pasar por
-// asignar(): con la sala llena acabaría en otra instancia y perdería la
-// acción). Réplica del tramo final de cambiarDeSala sin retorno ni caminata.
-function moverEspectador(esp, salaVieja, nueva, objetivo) {
-  salaVieja.salir(esp); // el 'sale' que difunde es inofensivo: nadie lo tenía
-  esp.retorno = null;
-  esp.canal = null; esp.escondido = null; esp.manila = null; esp.ofertaEn = null;
-  esp.caminataObjetivo = 0;
-  esp.x = objetivo.x; esp.y = objetivo.y;
-  esp.sec = (esp.sec || 0) + 1;
-  esp._posT = Date.now();
-  esp._margen = 0.8;
-  nueva.jugadores.set(esp.id, esp);
-  nueva.enviar(esp.ws, {
-    t: 'nivel', nivel: nueva.nivelId, inst: nueva.inst, semilla: nueva.semilla, privada: nueva.privada,
-    x: esp.x, y: esp.y, rot: esp.rot, sec: esp.sec,
-    via: `Sigues a ${objetivo.nombre} a través de la realidad.`,
-    sinTarjeta: true,
-    salud: esp.salud, sed: esp.sed, cordura: esp.cordura, inv: esp.inv, manos: esp.manos, equipo: esp.equipo,
-    retorno: null, caminata: null,
-    jugadores: nueva.censo(), ...nueva.estadoDinamico(),
-    espectador: { id: objetivo.id, nombre: objetivo.nombre },
-  });
-  if (esp._reSala) esp._reSala(nueva);
-  console.log(`[👁] ${esp.nombre}#${esp.id} sigue a ${objetivo.nombre}#${objetivo.id} → ${nueva.clave}`);
-}
+// prepararSala/esSinRetorno/cambiarDeSala Y moverEspectador viven en
+// game/js/sim/sala.js (compartidos con el modo offline local) y llegan por
+// el wrapper ./sala.
 
 // entra/sale/cambia de objetivo del modo espectador. La comparten el mensaje
 // ws {t:'espectar'} y el botón 👁 del observatorio (/accion). Devuelve
@@ -493,7 +391,6 @@ function espectar(jug, sala, objetivoId) {
   }
   return { ok: true, msg: `Observando a ${r.jug.nombre} en ${r.sala.def.nombre || r.sala.nivelId}.` };
 }
-
 // ---------- comandos de chat (moderación del streamer) ----------
 const { todas: salasVivas } = require('./sala');
 

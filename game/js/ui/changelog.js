@@ -4,6 +4,14 @@
 // tanda de cambios (junto con VERSION_JUEGO en main.js).
 (function () {
   const CHANGELOG = [
+    { v: 'v30.2', cambios: [
+      'El modo SIN CONEXIÓN es ahora el mismo juego que el online: movimiento libre, cámara, entidades y todas las mecánicas, con un servidor local corriendo dentro de tu navegador. (El antiguo modo por turnos queda aparcado.)',
+      'La remodelación no euclidiana de los niveles vuelve en el modo sin conexión: los pasillos pueden dejar de llevar al mismo sitio.',
+      'En el modo sin conexión, la fila 🐞 Debug de Ajustes funciona con cualquier clave: es tu propio mundo.',
+      'La pantalla de título estrena fondo panorámico animado y una distribución nueva que cabe entera en cualquier pantalla, sin barras de scroll. (andresaavelasquez-ctrl)',
+      'Los avisos y atajos muestran los botones de TU mando (iconos Xbox/PlayStation) y el HUD indica el dispositivo activo; en el mapa tu posición es una flecha orientada y tus marcas sobreviven a recargas. (treblalbert)',
+      'Arreglado: importar un expediente incompleto o dañado podía dejar el juego con un error en cada carga; ahora se recupera lo válido y se rechaza lo irrecuperable sin tocar tu perfil. (juanlotito)',
+    ] },
     { v: 'v30.1', cambios: [
       'Arreglado de raíz: la música del menú podía seguir sonando dentro de la partida (pasaba sobre todo si tu primer clic al cargar la página era directamente DESPERTAR).',
     ] },

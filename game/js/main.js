@@ -1,7 +1,7 @@
 // Arranque: input, bucle de animación y pantalla de título.
 (function () {
   // versión visible del juego (Ajustes); súbela con cada tanda de cambios
-  window.VERSION_JUEGO = 'v30.1';
+  window.VERSION_JUEGO = 'v30.2';
   const world = Game.world;
   world.data = window.GAME_DATA;
 
@@ -1429,10 +1429,12 @@
   if (params.get('nofx')) window.NOFX = true;
   if (params.get('debug3d')) window.DEBUG3D_ON = true;
   if (params.get('netdebug')) window.NETDEBUG = true; // consola: derivas de red y rtt
-  if ((params.get('autostart') || params.get('selftest') || params.get('online')) && !Game.Profiles.activeName())
+  if ((params.get('autostart') || params.get('selftest') || params.get('online') || params.get('local')) && !Game.Profiles.activeName())
     Game.Profiles.create(params.get('nombre') || 'Errante');
   // ---------- BACKROOMS MMO: ?online=1 conecta al mundo compartido ----------
-  if (params.get('online')) {
+  // ?local=1 = MISMO juego con el servidor local de la pestaña (modo offline)
+  if (params.get('online') || params.get('local')) {
+    if (params.get('local')) window.MODO_LOCAL = true;
     Net.iniciar(params.get('nombre') || Game.Profiles.activeName() || 'Errante');
     // la tarjeta del nivel aparece al recibir la bienvenida; se entra sola
     const esperaCard = setInterval(() => {
@@ -1470,8 +1472,124 @@
   }
   window.DEBUG_GAME = Game; // consola de depuración
 
-  // ---------- autoprueba: ?selftest=200 juega N acciones aleatorias ----------
-  if (params.get('selftest')) {
+  // ---------- autoprueba del modo LOCAL/ONLINE: ?local=1&selftest=300 ----------
+  // bot de movimiento LIBRE: camina hacia la salida más cercana con Net.setInput,
+  // entra a las tarjetas y responde las ofertas de cruce (70% CRUZAR)
+  if (params.get('selftest') && (params.get('local') || params.get('online'))) {
+    const errores = [];
+    window.onerror = (msg, src, line) => { errores.push(`${msg} @${(src || '').split('/').pop()}:${line}`); };
+    const N = parseInt(params.get('selftest'), 10) || 300;
+    let ticks = 0;
+    const visitados = new Set();
+    let rumbo = null; // { nivel, dist } — dmap BFS hacia la salida elegida
+    let huyeHasta = -1;      // hasta este tick: vagar lejos (anti-atasco)
+    let huidaDir = null;
+    let ultimaPos = '', quieto = 0;
+    const iv2 = setInterval(() => {
+      try {
+        if (!Net.activo || !world.level || !world.map) return;
+        visitados.add(world.level.id);
+        if (ticks >= N) {
+          clearInterval(iv2);
+          window.joyDx = 0; window.joyDy = 0;
+          Net.parar();
+          const div = document.createElement('div');
+          div.id = 'selftest-result';
+          div.textContent = JSON.stringify({
+            ticks,
+            nivel: world.level?.id,
+            visitados: [...visitados],
+            posicion: [world.player?.x, world.player?.y],
+            mapa: world.map ? [world.map.grid.w, world.map.grid.h] : null,
+            salud: world.player?.salud,
+            sed: world.player?.sed,
+            cordura: world.player?.cordura,
+            inv: world.player?.inv,
+            entidadesVivas: world.entities.filter((e) => e.viva).length,
+            errores,
+            erroresRender: window.__renderErrors || [],
+            // verdad del lado sala (solo en modo local): barras y rechazos
+            local: window.MODO_LOCAL && window.Local && Local.jugador ? {
+              sed: Local.jugador.sed, salud: Local.jugador.salud,
+              cordura: Local.jugador.cordura,
+              posSala: [Math.round(Local.jugador.x * 10) / 10, Math.round(Local.jugador.y * 10) / 10],
+              caminado: Math.round(Local.jugador._sedAcum || 0),
+              rechazos: Local.jugador.rechazos, stats: Local.stats,
+            } : null,
+          });
+          document.body.appendChild(div);
+          document.title = errores.length ? 'SELFTEST-ERRORES' : 'SELFTEST-OK';
+          return;
+        }
+        ticks++;
+        // tarjeta de nivel a la vista: entrar
+        const card = document.getElementById('screen-card');
+        if (card.style.display !== 'none') { document.getElementById('btn-enter').click(); return; }
+        // oferta de salida (showChoice): CRUZAR al 70%; tras un «Aún no» hay
+        // que ALEJARSE — si no, el bot se queda empujando la puerta: sin
+        // desplazamiento no hay informes de posición ni re-oferta (atasco)
+        const choice = document.getElementById('choice-modal');
+        if (choice && choice.style.display !== 'none') {
+          const btns = document.querySelectorAll('#choice-btns button');
+          if (btns.length) {
+            const cruza = Math.random() < 0.7;
+            (cruza ? btns[0] : btns[btns.length - 1]).click();
+            if (!cruza) huyeHasta = ticks + 25;
+          }
+          return;
+        }
+        // anti-atasco: ~2 s sin desplazarse (empujando pared/puerta) → vagar
+        const posK = Math.round(world.player.x * 4) + ',' + Math.round(world.player.y * 4);
+        if (posK === ultimaPos) {
+          if (++quieto > 20 && huyeHasta < ticks) { huyeHasta = ticks + 15; quieto = 0; }
+        } else { quieto = 0; ultimaPos = posK; }
+        // rumbo: dmap BFS desde la salida más cercana (cache por nivel)
+        const g = world.map.grid;
+        const px = Math.round(world.player.x), py = Math.round(world.player.y);
+        if ((!rumbo || rumbo.nivel !== world.level.id) && world.map.exits.length) {
+          let best = null, bestD = Infinity;
+          for (const ex of world.map.exits) {
+            const dist = MapGen.bfsDist(g, ex.x, ex.y);
+            const v = dist[py * g.w + px];
+            if (v >= 0 && v < bestD) { bestD = v; best = dist; }
+          }
+          if (best) rumbo = { nivel: world.level.id, dist: best };
+        }
+        let dx = 0, dy = 0;
+        if (ticks < huyeHasta) {
+          if (!huidaDir || Math.random() < 0.1) {
+            const a = Math.random() * Math.PI * 2;
+            huidaDir = [Math.cos(a), Math.sin(a)];
+          }
+          dx = huidaDir[0]; dy = huidaDir[1];
+        } else if (rumbo && rumbo.nivel === world.level.id && Math.random() < 0.85) {
+          const actual = rumbo.dist[py * g.w + px];
+          for (const [mx, my] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+            const nx = px + mx, ny = py + my;
+            if (nx < 0 || ny < 0 || nx >= g.w || ny >= g.h) continue;
+            const v = rumbo.dist[ny * g.w + nx];
+            if (v >= 0 && (actual < 0 || v < actual)) { dx = mx; dy = my; break; }
+          }
+        }
+        if (!dx && !dy) {
+          const a = Math.random() * Math.PI * 2;
+          dx = Math.cos(a); dy = Math.sin(a);
+        }
+        // el bot «mueve el joystick táctil»: el bucle de frames suma joyDx/
+        // joyDy al vector de input (llamar a Net.setInput directamente no
+        // sirve — el bucle lo recalcula y pisa en cada frame)
+        const n = Math.hypot(dx, dy) || 1;
+        window.joyDx = dx / n;
+        window.joyDy = dy / n;
+      } catch (e) {
+        errores.push(String(e && e.message || e));
+        ticks++;
+      }
+    }, 100);
+  }
+
+  // ---------- autoprueba clásica (modo por turnos): ?selftest=200 ----------
+  if (params.get('selftest') && !params.get('local') && !params.get('online')) {
     const errores = [];
     window.onerror = (msg, src, line) => { errores.push(`${msg} @${(src || '').split('/').pop()}:${line}`); };
     const N = parseInt(params.get('selftest'), 10) || 100;
@@ -1843,14 +1961,13 @@
   $id('btn-start').onclick = () => {
     conectarAlServidor($id('btn-start'));
   };
-  // modo offline (partida en solitario, sin servidor): recarga con
-  // ?autostart=1 — es la señal que ya usa TODO el arranque offline
-  // (input por turnos, D-pad táctil...), así no hay un segundo camino
+  // modo offline (partida en solitario, sin servidor): el MISMO juego online
+  // con el servidor LOCAL de la pestaña (net/local.js) — mismas reglas,
+  // mismo movimiento libre, misma cámara. El modo por turnos clásico queda
+  // aparcado tras ?autostart=1 (referencia y selftest).
   $id('btn-offline').onclick = () => {
-    const p = new URLSearchParams(location.search);
-    p.set('autostart', '1');
-    p.delete('online');
-    location.search = p.toString();
+    window.MODO_LOCAL = true;
+    conectarAlServidor($id('btn-offline'));
   };
   $id('btn-again').onclick = () => {
     refreshTitle();

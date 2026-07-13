@@ -9,6 +9,17 @@ Guía de todo lo que puedes hacer/modificar tú mismo, sin programar.
 
 **Doble clic en `game/index.html`.** Nada que instalar. Funciona sin internet.
 
+**Modo sin conexión = el MISMO juego que el online.** El botón pequeño «jugar sin
+conexión (modo solo)» de la portada arranca una partida en solitario con un
+**servidor local dentro de tu navegador**: mismas reglas, mismo movimiento libre,
+misma cámara, mismas entidades — literalmente el mismo código que usa el servidor
+real. Extras del modo local: los comandos de guardián `/tp <nivel>` y `/give <objeto>`
+funcionan con cualquier clave (es tu mundo), y la **remodelación no euclidiana**
+de los niveles está activa (online sigue apagada). Cada carga de página es una run
+nueva (como reconectar online); el Códice sí conserva tus descubrimientos.
+Por URL: `?local=1` (y `?nivel=level-N` para saltar a un nivel). El antiguo modo
+por turnos queda aparcado en `?autostart=1` como referencia.
+
 El juego se renderiza en **3D real en TERCERA PERSONA** (motor Three.js incluido): la cámara
 va pegada a la espalda del errante, los niveles interiores tienen **techo real con
 fluorescentes**, bloom cinematográfico y polvo en suspensión. Alternativas por URL:

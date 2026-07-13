@@ -69,6 +69,20 @@
     const params = new URLSearchParams(location.search);
     salaActual = sala || null;
     ultimoError = null;
+    if (window.MODO_LOCAL) {
+      // MODO OFFLINE = servidor LOCAL (net/local.js): las mismas reglas del
+      // mundo corren en esta pestaña y este cliente ni se entera. Sin ping
+      // (rtt 0), sin reintentos, sin autoActualizar: no hay red que falle.
+      // (si venimos de un intento online fallido, sus reintentos mueren aquí)
+      clearTimeout(reintento);
+      clearInterval(pingTimer);
+      w.local = true;
+      rtt = 0;
+      // en local la puerta de desarrollo ?nivel= está siempre abierta (es tu
+      // propio mundo); online la decide el servidor con MMO_DEV=1
+      ws = Local.conectar(nombre, (m) => recibir(m, w), params.get('nivel') || undefined);
+      return;
+    }
     ws = new WebSocket(urlServidor());
     ws.onopen = () => enviar({
       t: 'hola', nombre, token: token(), v: 8, // debe coincidir con protocolo.js
