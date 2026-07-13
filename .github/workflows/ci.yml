@@ -28,6 +28,9 @@ jobs:
       - name: Tests del parser de la wiki
         run: node pipeline/parse.test.js
 
+      - name: Tests de perfiles locales
+        run: node game/js/systems/game.test.js
+
       - name: Auditoría de Level 0 (100 semillas deterministas)
         run: node pipeline/level0-audit.js
 
