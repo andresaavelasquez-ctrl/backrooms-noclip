@@ -51,6 +51,20 @@ try {
   j2.jug.caminataObjetivo = 1;
   abierta.caminataAvanza(j2.jug, 1);
   ok(destino === 'level-1', 'la caminata valida cruza al destino esperado');
+
+  const level6 = asignar('level-6');
+  const j3 = jugador('caminata-level-6');
+  level6.prepararCaminata(j3.jug);
+  ok(level6.map.exits.length === 2, 'Level 6 genera sus dos salidas fisicas');
+  ok(j3.jug.caminataObjetivo > 0, 'Level 6 prepara la salida personal por caminata');
+
+  let destino6 = null;
+  level6.alCruzar = (jug, sala, def) => { destino6 = def.destino; };
+  j3.jug.caminataObjetivo = 1;
+  level6.caminataAvanza(j3.jug, 1);
+  ok(destino6 === 'level-7', 'vagar por Level 6 cruza a Level 7');
+  ok(!j3.mensajes.some((m) => /fuera del piloto/.test(m.txt || '')),
+    'Level 6 no muestra el aviso de destino fuera del piloto');
 } catch (e) {
   ok(false, e.stack || e.message);
 }

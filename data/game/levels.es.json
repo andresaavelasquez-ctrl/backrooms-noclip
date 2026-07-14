@@ -397,7 +397,8 @@
    {
     "texto": "Vagar lo suficiente, o seguir una luz anómala, lleva a Level 7",
     "destino": "level-7",
-    "tipo": "normal"
+    "tipo": "normal",
+    "mecanica": "caminata"
    }
   ],
   "esEscape": false,

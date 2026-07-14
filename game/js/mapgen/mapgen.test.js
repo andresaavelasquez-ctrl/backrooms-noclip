@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 global.window = global;
+require('../data.js');
 require('../engine/rng.js');
 require('./mapgen.js');
 
@@ -29,4 +30,20 @@ test('invernadero con altura no divisible por 3 no cae al fallback de pasillos',
 
   assert.ok(counts.walkable >= 60, 'el mapa debe tener suelo suficiente para jugar');
   assert.ok(counts.vacio > 0, 'el invernadero debe conservar vacio; el fallback de pasillos no tiene vacio');
+});
+
+test('Level 6 conserva dos salidas físicas y la salida por caminata', () => {
+  const def = GAME_DATA.levels['level-6'];
+
+  for (let i = 0; i < 100; i++) {
+    const seed = `regresion-level-6::${i}`;
+    const map = MapGen.generate(def, RNG.create(seed));
+    const destinosFisicos = map.exits.map((e) => e.def.destino).sort();
+
+    assert.deepEqual(destinosFisicos, ['level-6-1', 'level-8'], `${seed}: salidas físicas`);
+    assert.deepEqual(map.caminatas.map((s) => s.destino), ['level-7'], `${seed}: salida por caminata`);
+    for (const salida of [...map.exits.map((e) => e.def), ...map.caminatas]) {
+      assert.ok(GAME_DATA.levels[salida.destino], `${seed}: existe ${salida.destino}`);
+    }
+  }
 });
