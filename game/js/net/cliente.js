@@ -85,7 +85,7 @@
     }
     ws = new WebSocket(urlServidor());
     ws.onopen = () => enviar({
-      t: 'hola', nombre, token: token(), v: 8, // debe coincidir con protocolo.js
+      t: 'hola', nombre, token: token(), v: 9, // debe coincidir con protocolo.js
       nivel: params.get('nivel') || undefined, // puerta de desarrollo (solo MMO_DEV=1)
       sala: salaActual || undefined,
     });
