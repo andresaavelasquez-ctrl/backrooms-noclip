@@ -7,6 +7,7 @@
     { v: 'v30.13', cambios: [
       'Level 1 ahora sufre apagones globales: los fluorescentes fallan, el zumbido se corta y todas sus instancias quedan a oscuras a la vez durante unos segundos. La linterna sigue siendo útil. (josealmon)',
       'La sed baja más despacio y usar un objeto con la sed a cero ya no provoca una muerte instantánea: la deshidratación vuelve a causar daño gradual. (josealmon)',
+      'Level 13, Level 14 y Level 45 estrenan ambiente sonoro propio, inspirado en la wiki. (Jake-7776)',
     ] },
     { v: 'v30.12', cambios: [
       'Level 0 ya no es un secarral: hay más botellas de agua de almendras por el suelo, más taquillas que registrar, y un resultado medio del dado (12-13) en sus taquillas ahora encuentra agua. El resto de niveles no cambia. (josealmon)',
